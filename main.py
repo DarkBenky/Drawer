@@ -44,11 +44,14 @@ class Layers:
         # Reset color to black for removed items
         self.colors[layer][mask] = (0, 0, 0)
     
-    def return_img(self):
+    def return_img(self, render_current: bool , current_layer: int ):
         start = time.time()
         img = np.zeros((screen_width, screen_height, 3), dtype=np.uint8)
-        for layer in range(len(self.layers)):
-            img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
+        if render_current:
+            img[self.layers[current_layer]] = self.colors[current_layer][self.layers[current_layer]]
+        else:
+            for layer in range(len(self.layers)):
+                img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
         print('return_img:',time.time()-start)
         return img
     
@@ -93,6 +96,8 @@ clock = pygame.time.Clock()
 # Game loop
 running = True
 current_layer = 0
+render_current = False
+
 while running:
     # Handle events
     for event in pygame.event.get():
@@ -107,11 +112,15 @@ while running:
                 current_layer = min(current_layer + 1, 9)
                 print(f'{current_layer=}')
             elif event.key == pygame.K_DOWN:
-                current_layer = max(current_layer - 1, 0)
+                current_layer = max(current_layer - 1, -1)
                 print(f'{current_layer=}')
             elif event.key == pygame.K_r:
                 COLOR = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                 print(f'{COLOR=}')
+            elif event.key == pygame.K_SPACE:
+                render_current = not render_current
+                print(f'{render_current=}')
+            
         
             
         
@@ -134,7 +143,7 @@ while running:
                 layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
     
 
-    screen.blit(pygame.surfarray.make_surface(layers.return_img()), (0, 0))
+    screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     pygame.display.flip()
     
     # Cap the frame rate and show FPS on title
