@@ -5,7 +5,6 @@ import time
 import mask_gen
 
 
-
 # Initialize Pygame
 pygame.init()
 
@@ -33,6 +32,7 @@ class Layers:
         self.layers = [np.zeros((screen_width, screen_height), dtype=bool) for _ in range(number_of_layers)]
         self.colors = [np.zeros((screen_width, screen_height, 3), dtype=np.uint8) for _ in range(number_of_layers)]
         self.last_rendered_layers = None
+        self.update = False
     
     def merge_all_layers(self):
         # Create an empty merged layer
@@ -53,14 +53,14 @@ class Layers:
         
 
     def add_items(self, layer: int, mask: np.ndarray, color: tuple):
-        star = time.time()
+        # star = time.time()
         """
         previous implementation 
         self.layers[layer] |= mask
         self.colors[layer][mask] = color
         """
         self.layers[layer], self.colors[layer] = mask_gen.add_items_cython(self.layers[layer], self.colors[layer], mask, color)
-        print('add_items:',time.time()-star)
+        # print('add_items:',time.time()-star)
     
 
     def remove_items(self, layer: int, mask: np.ndarray):
@@ -70,7 +70,7 @@ class Layers:
         self.layers[layer], self.colors[layer] = mask_gen.remove_cython(self.layers[layer], self.colors[layer], mask)
     
     def return_img(self, render_current: bool, current_layer: int):
-        start = time.time()
+        # start = time.time()
         img = np.zeros((self.screen_width, self.screen_height, 3), dtype=np.uint8)
         
         # Check if rendering only the current layer
@@ -78,10 +78,10 @@ class Layers:
             img[self.layers[current_layer]] = self.colors[current_layer][self.layers[current_layer]]
         else:
             # Check if layers have changed since last render
-            if self.last_rendered_layers is not None:
+            if self.last_rendered_layers is not None and self.update is False:
                 if all(np.array_equal(layer1, layer2) for layer1, layer2 in zip(self.layers, self.last_rendered_layers)):
                     # No changes, return the previous image
-                    print('return_img:', time.time() - start)
+                    # print('return_img:', time.time() - start), lenght
                     return self.last_rendered_image
             
             # Render all layers
@@ -91,13 +91,34 @@ class Layers:
             # Cache the rendered layers and image
             self.last_rendered_layers = [layer.copy() for layer in self.layers]
             self.last_rendered_image = img
+            self.update = False
         
-        print('return_img:', time.time() - start)
+        # print('return_img:', time.time() - start)
         return img
     
+    def blur(self, x : int, y : int, radius: int , layer: int):
+        mask = mask_gen.box_mask_cython(x, y, radius, self.screen_width, self.screen_height)
+        
+        colors = self.colors[layer][mask]
+        length = colors.shape[0]
+        size = int(np.ceil(np.sqrt(length)))
+        
+        rows = length // size
+        cols = size if length % size == 0 else size + 1
+        
+        # Reshape the array to the closest box shape
+        reshaped_arr = np.resize(colors, (rows, cols , 3))
+
+        # Average the colors
+        colors = mask_gen.blur_cython(reshaped_arr, radius // 2)
+        colors = np.resize(colors, (length, 3))
+        
+        self.colors[layer][mask] = colors
+        self.update = True
+
     def draw(self, layer: int, x: int, y: int, radius: int, color: tuple):
         # Create a circular mask
-        start = time.time()
+        # start = time.time()
         # mask = np.zeros((screen_width, screen_height), dtype=bool)
         # r = radius ** 2
         # for i in range(-radius, radius):
@@ -107,9 +128,9 @@ class Layers:
         #             new_y = y + j
         #             if 0 <= new_x < screen_width and 0 <= new_y < screen_height:
         #                 mask[new_x, new_y] = True
-        mask = mask_gen.draw_cython(x, y, radius, color , self.screen_width, self.screen_height)
+        mask = mask_gen.draw_cython(x, y, radius, self.screen_width, self.screen_height)
 
-        print('draw:',time.time()-start)
+        # print('draw:',time.time()-start)
         # Add items with a copy of the mask
         self.add_items(layer, mask.copy(), color)
 
@@ -124,6 +145,7 @@ layers = Layers(num_layers, screen_width, screen_height)
 # Set up the drawing variables
 drawing = False
 erasing = False
+averaging = False
 radius = 5
 
 clock = pygame.time.Clock()
@@ -168,35 +190,44 @@ while running:
                 pos = pygame.mouse.get_pos()
                 layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
                 drawing = True
-            elif event.button == 4:
+            elif event.button == 4: # Scroll up
                 radius = min(radius + 1, 50)
                 print(f'{radius=}')
-            elif event.button == 5:
+            elif event.button == 5: # Scroll down
                 radius = max(radius - 1, 1)
                 print(f'{radius=}')
-            elif event.button == 3:
+            elif event.button == 3: # Right mouse button
                 pos = pygame.mouse.get_pos()
-                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, (0,0,0), screen_width, screen_height))
+                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, screen_width, screen_height))
                 erasing = True
+            elif event.button == 2: # Middle mouse button
+                pos = pygame.mouse.get_pos()
+                layers.blur(pos[0], pos[1], radius, current_layer)
+                print('average')
+                averaging = True
                 
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:  # Left mouse button
                 drawing = False
             elif event.button == 3:
                 erasing = False
+            elif event.button == 2:
+                averaging = False
         elif event.type == pygame.MOUSEMOTION:
             if drawing:
                 pos = pygame.mouse.get_pos()
                 layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
             elif erasing:
                 pos = pygame.mouse.get_pos()
-                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, (0,0,0), screen_width, screen_height))
+                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, screen_width, screen_height))
+            elif averaging:
+                pos = pygame.mouse.get_pos()
+                layers.blur(pos[0], pos[1], radius, current_layer)
                 
-                
-    start = time.time()
+    # start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     pygame.display.flip()
-    print('blit:',time.time()-start)
+    # print('blit:',time.time()-start)
     
     # Cap the frame rate and show FPS on title
     clock.tick(1024)  # Cap at 60 FPS
