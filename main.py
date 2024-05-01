@@ -10,8 +10,8 @@ import mask_gen
 pygame.init()
 
 # Set up the display
-screen_width = 650
-screen_height = 500
+screen_width = 600
+screen_height = 400
 num_layers = 5
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Drawing App")
@@ -33,6 +33,24 @@ class Layers:
         self.layers = [np.zeros((screen_width, screen_height), dtype=bool) for _ in range(number_of_layers)]
         self.colors = [np.zeros((screen_width, screen_height, 3), dtype=np.uint8) for _ in range(number_of_layers)]
         self.last_rendered_layers = None
+    
+    def merge_all_layers(self):
+        # Create an empty merged layer
+        merged_layer = np.zeros((self.screen_width, self.screen_height), dtype=bool)
+        merged_color = np.zeros((self.screen_width, self.screen_height, 3), dtype=np.uint8)
+
+        # Merge all layers into one
+        for layer, color in zip(self.layers, self.colors):
+            merged_layer |= layer
+            merged_color[layer] = color[layer]
+
+        # clear all layers
+        self.clear()
+        
+        # Save the merged layer as layer 0
+        self.layers[0] = merged_layer
+        self.colors[0] = merged_color
+        
 
     def add_items(self, layer: int, mask: np.ndarray, color: tuple):
         star = time.time()
@@ -41,14 +59,15 @@ class Layers:
         self.layers[layer] |= mask
         self.colors[layer][mask] = color
         """
-        self.layers[layer], self.colors[layer] = mask_gen.add_items_cython(self.layers[layer], self.colors[layer], mask, layer, color)
+        self.layers[layer], self.colors[layer] = mask_gen.add_items_cython(self.layers[layer], self.colors[layer], mask, color)
         print('add_items:',time.time()-star)
     
 
     def remove_items(self, layer: int, mask: np.ndarray):
-        self.layers[layer] &= ~mask
-        # Reset color to black for removed items
-        self.colors[layer][mask] = (0, 0, 0)
+        # self.layers[layer] &= ~mask
+        # # Reset color to black for removed items
+        # self.colors[layer][mask] = (0, 0, 0)
+        self.layers[layer], self.colors[layer] = mask_gen.remove_cython(self.layers[layer], self.colors[layer], mask)
     
     def return_img(self, render_current: bool, current_layer: int):
         start = time.time()
@@ -104,6 +123,7 @@ layers = Layers(num_layers, screen_width, screen_height)
 
 # Set up the drawing variables
 drawing = False
+erasing = False
 radius = 5
 
 clock = pygame.time.Clock()
@@ -136,12 +156,17 @@ while running:
             elif event.key == pygame.K_SPACE:
                 render_current = not render_current
                 print(f'{render_current=}')
+            elif event.key == pygame.K_m:
+                current_layer = 0
+                layers.merge_all_layers()
             
         
             
         
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
+                pos = pygame.mouse.get_pos()
+                layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
                 drawing = True
             elif event.button == 4:
                 radius = min(radius + 1, 50)
@@ -149,15 +174,25 @@ while running:
             elif event.button == 5:
                 radius = max(radius - 1, 1)
                 print(f'{radius=}')
-            
+            elif event.button == 3:
+                pos = pygame.mouse.get_pos()
+                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, (0,0,0), screen_width, screen_height))
+                erasing = True
+                
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:  # Left mouse button
                 drawing = False
+            elif event.button == 3:
+                erasing = False
         elif event.type == pygame.MOUSEMOTION:
             if drawing:
                 pos = pygame.mouse.get_pos()
                 layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
-    
+            elif erasing:
+                pos = pygame.mouse.get_pos()
+                layers.remove_items(current_layer, mask_gen.draw_cython(pos[0], pos[1], radius, (0,0,0), screen_width, screen_height))
+                
+                
     start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     pygame.display.flip()

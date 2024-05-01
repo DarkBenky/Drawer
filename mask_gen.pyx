@@ -6,10 +6,19 @@ import numpy as np
 cimport numpy as np
 from libc.math cimport pow
 
+cpdef remove_cython(np.ndarray[np.npy_bool, ndim=2] layers,
+                          np.ndarray[np.uint8_t, ndim=3] colors,
+                          np.ndarray[np.npy_bool, ndim=2] mask):
+
+    layers &= ~mask
+    colors[mask] = (0, 0, 0)  # Assign black color to elements corresponding to the mask
+
+    return layers, colors
+
 cpdef add_items_cython(np.ndarray[np.npy_bool, ndim=2] layers,
                        np.ndarray[np.uint8_t, ndim=3] colors,
                        np.ndarray[np.npy_bool, ndim=2] mask,
-                       int layer, tuple color):
+                       tuple color):
 
     layers |= mask
     colors[mask] = color  # Assign color to elements corresponding to the mask
