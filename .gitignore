@@ -1,2 +1,3 @@
-/render.pyx
-/setup.py
+/build
+*.so
+*.c

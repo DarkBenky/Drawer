@@ -1,30 +1,9 @@
-import pygame
+import pyglet
+from pyglet.window import key
 import numpy as np
 import random
 import time
 import mask_gen
-
-
-
-# Initialize Pygame
-pygame.init()
-
-# Set up the display
-screen_width = 650
-screen_height = 500
-num_layers = 5
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Drawing App")
-
-# Set up colors
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-COLOR = (255, 0, 0)
-
-
-
-
-
 
 class Layers:
     def __init__(self, number_of_layers=5 , screen_width=650, screen_height=500):
@@ -99,76 +78,94 @@ class Layers:
             self.layers[i].fill(False)
             self.colors[i][:] = (0, 0, 0) 
 
+screen_width = 650
+screen_height = 500
+
+num_layers = 5
+
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+COLOR = (255, 0, 0)
+
 
 layers = Layers(num_layers, screen_width, screen_height)
 
-# Set up the drawing variables
+
+
+# Initialize Pyglet window and other variables
+config = pyglet.gl.Config(double_buffer=True ,major_version = 3, minor_version = 3, depth_size = 16)
+window = pyglet.window.Window(screen_width, screen_height, config=config)
+current_layer = 0
+render_current = False
 drawing = False
 radius = 5
 
-clock = pygame.time.Clock()
+frames = 0
+fps_display = pyglet.window.FPSDisplay(window)
 
+fps_display_label = pyglet.text.Label('', font_size=12, x=10, y=10, anchor_x='left', anchor_y='bottom')
 
-# Game loop
-running = True
-current_layer = 0
-render_current = False
+@window.event
+def on_draw():
+    window.clear()
+    image_data = layers.return_img(render_current=render_current, current_layer=current_layer)
+    image_data_transposed = np.transpose(image_data, (1, 0, 2))
 
-while running:
-    # Handle events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_c:
-                layers.clear() 
-            elif event.key == pygame.K_s:
-                pygame.image.save(screen, "drawing.png")
-            elif event.key == pygame.K_UP:
-                current_layer = min(current_layer + 1, num_layers-1)
-                print(f'{current_layer=}')
-            elif event.key == pygame.K_DOWN:
-                current_layer = max(current_layer - 1, 0)
-                print(f'{current_layer=}')
-            elif event.key == pygame.K_r:
-                COLOR = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                print(f'{COLOR=}')
-            elif event.key == pygame.K_SPACE:
-                render_current = not render_current
-                print(f'{render_current=}')
-            
-        
-            
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left mouse button
-                drawing = True
-            elif event.button == 4:
-                radius = min(radius + 1, 50)
-                print(f'{radius=}')
-            elif event.button == 5:
-                radius = max(radius - 1, 1)
-                print(f'{radius=}')
-            
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:  # Left mouse button
-                drawing = False
-        elif event.type == pygame.MOUSEMOTION:
-            if drawing:
-                pos = pygame.mouse.get_pos()
-                layers.draw(current_layer,pos[0],pos[1],radius,COLOR)
+    # Convert the image data to bytes
+    image_data_bytes = image_data_transposed.astype(np.uint8).tobytes()
+
+    image = pyglet.image.ImageData(screen_width, screen_height, 'RGB', image_data_bytes)
+    image.blit(0, 0)
     
-    start = time.time()
-    screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
-    pygame.display.flip()
-    print('blit:',time.time()-start)
-    
-    # Cap the frame rate and show FPS on title
-    clock.tick(1024)  # Cap at 60 FPS
-    pygame.display.set_caption(f"Pygame FPS Demo - FPS: {clock.get_fps()}")
+    fps_display.draw()
 
-    # print('fps:',clock.get_fps())  # Print FPS to console
-    
+@window.event
+def on_key_press(symbol, modifiers):
+    global current_layer, render_current, COLOR
+    if symbol == key.C:
+        layers.clear()
+    elif symbol == key.S:
+        pyglet.image.save(window.canvas, "drawing.png")
+    elif symbol == key.UP:
+        current_layer = min(current_layer + 1, num_layers)
+        print(f'{current_layer=}')
+    elif symbol == key.DOWN:
+        current_layer = max(current_layer - 1, 0)
+        print(f'{current_layer=}')
+    elif symbol == key.R:
+        COLOR = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        print(f'{COLOR=}')
+    elif symbol == key.SPACE:
+        render_current = not render_current
+        print(f'{render_current=}')
 
-# Quit Pygame
-pygame.quit()
+@window.event
+def on_mouse_press(x, y, button, modifiers):
+    global drawing
+    if button == pyglet.window.mouse.LEFT:
+        drawing = True
+    
+@window.event  
+def on_mouse_scroll(x, y, scroll_x, scroll_y):
+    global radius
+    if scroll_y > 0:
+        radius = min(radius + 1, 50)
+        print(f'Radius increased: {radius}')
+    elif scroll_y < 0:
+        radius = max(radius - 1, 1)
+        print(f'Radius decreased: {radius}')
+
+@window.event
+def on_mouse_release(x, y, button, modifiers):
+    global drawing
+    if button == pyglet.window.mouse.LEFT:
+        drawing = False
+
+@window.event
+def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
+    global drawing
+    if drawing:
+        layers.draw(current_layer, x, y, radius, COLOR)
+
+# Run Pyglet application
+pyglet.app.run()
