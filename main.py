@@ -3,6 +3,7 @@ import numpy as np
 import random
 import time
 import mask_gen
+import pygame_gui
 
 
 # Initialize Pygame
@@ -12,8 +13,10 @@ pygame.init()
 screen_width = 600
 screen_height = 400
 num_layers = 5
+global screen
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Drawing App")
+gui_manager = pygame_gui.UIManager((screen_width, screen_height)) 
 
 # Set up colors
 BLACK = (0, 0, 0)
@@ -21,8 +24,12 @@ WHITE = (255, 255, 255)
 COLOR = (255, 0, 0)
 
 
-
-
+def draw_gui(current_selection : str , brush_size :str):
+    gui_manager.clear_and_reset()
+    label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((10, 10),(100,50)), text=current_selection, manager=gui_manager)
+    brush_size_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((90, 10),(140,50)), text='brush size: '+brush_size, manager=gui_manager)
+    gui_manager.update(1)
+    gui_manager.draw_ui(screen)
 
 
 class Layers:
@@ -156,6 +163,9 @@ running = True
 current_layer = 0
 render_current = False
 
+tools = ['draw', 'erase', 'blur box' , 'blur circle' , 'contrast box' , 'contrast circle']
+current_tool = 0
+
 while running:
     # Handle events
     for event in pygame.event.get():
@@ -181,6 +191,9 @@ while running:
             elif event.key == pygame.K_m:
                 current_layer = 0
                 layers.merge_all_layers()
+            elif event.key == pygame.K_t:
+                current_tool = (current_tool + 1) % len(tools)
+                print(f'{tools[current_tool]=}')
             
         
             
@@ -226,8 +239,14 @@ while running:
                 
     # start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
+    
+    # draw gui
+    draw_gui(tools[current_tool], str(radius))
+    
     pygame.display.flip()
     # print('blit:',time.time()-start)
+    
+    
     
     # Cap the frame rate and show FPS on title
     clock.tick(1024)  # Cap at 60 FPS
