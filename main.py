@@ -162,7 +162,27 @@ class Layers:
         colors = np.resize(colors, (length, 3))
         
         self.colors[layer][mask] = colors
-        self.update = True    
+        self.update = True
+    
+    # TODO: Fix this method
+    def edge(self, x : int, y : int, radius: int , layer: int):
+        mask = mask_gen.box_mask_cython(x, y, radius, self.screen_width, self.screen_height)
+        
+        colors = self.colors[layer][mask]
+        length = colors.shape[0]
+        size = int(np.ceil(np.sqrt(length)))
+        
+        rows = length // size
+        cols = size if length % size == 0 else size + 1
+        
+        # Reshape the array to the closest box shape
+        reshaped_arr = np.resize(colors, (rows, cols , 3))
+
+        colors = mask_gen.sobel_filter_cython(reshaped_arr)
+        colors = np.resize(colors, (length, 3))
+        
+        self.colors[layer][mask] = colors
+        self.update = True
         
     def blur_circle(self, x : int, y : int, radius: int , layer: int):
         mask = mask_gen.draw_cython(x, y, radius, self.screen_width, self.screen_height)
@@ -239,6 +259,7 @@ contrast = False
 contrast_circle = False
 drawing_box = False
 erase_box = False
+edge = False
 
 radius = 5
 
@@ -250,7 +271,7 @@ running = True
 current_layer = 0
 render_current = False
 
-tools = ['draw', 'draw box' , 'erase' , 'erase box', 'blur' , 'blur circle' , 'contrast' , 'contrast circle']
+tools = ['draw', 'draw box' , 'erase' , 'erase box', 'blur' , 'blur circle' , 'contrast' , 'contrast circle' , 'edge']
 current_tool = 0
 current_selected_tool = tools[current_tool]
 
@@ -282,10 +303,7 @@ while running:
             elif event.key == pygame.K_t:
                 current_tool = (current_tool + 1) % len(tools)
                 print(f'{tools[current_tool]=}')
-                current_selected_tool = tools[current_tool]
-            
-        
-            
+                current_selected_tool = tools[current_tool]       
         
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
@@ -316,6 +334,9 @@ while running:
                 elif current_selected_tool == 'erase box':
                     layers.remove_items(current_layer, mask_gen.box_mask_cython(pos[0], pos[1], radius, screen_width, screen_height))
                     erase_box = True
+                elif current_selected_tool == 'edge':
+                    layers.edge(pos[0], pos[1], radius, current_layer)
+                    edge = True
                 
             elif event.button == 4: # Scroll up
                 radius = min(radius + 1, 50)
@@ -345,6 +366,7 @@ while running:
                 contrast_circle = False
                 drawing_box = False
                 erase_box = False
+                edge = False
                 
         elif event.type == pygame.MOUSEMOTION:
             if drawing:
@@ -371,7 +393,10 @@ while running:
             elif erase_box:
                 pos = pygame.mouse.get_pos()
                 layers.remove_items(current_layer, mask_gen.box_mask_cython(pos[0], pos[1], radius, screen_width, screen_height))
-            
+            elif edge:
+                pos = pygame.mouse.get_pos()
+                layers.edge(pos[0], pos[1], radius, current_layer)
+                
     # start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     
