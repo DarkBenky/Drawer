@@ -92,35 +92,27 @@ cpdef decrease_contrast_cython(np.ndarray[np.uint8_t, ndim=3] color_layer, int r
 
 # TODO: Implement the functions in Python
 
-cpdef sobel_filter_cython(np.ndarray[np.uint8_t, ndim=3] image):
+cpdef edge_cython(np.ndarray[np.uint8_t, ndim=3] image, tuple edge_color, int threshold):
     cdef int height = image.shape[0]
     cdef int width = image.shape[1]
     cdef int channels = image.shape[2]
-    cdef np.ndarray[np.uint8_t, ndim=3] result = np.zeros((height, width, channels), dtype=np.uint8)
+    cdef np.ndarray[np.uint8_t, ndim=3] result = image.copy()
     cdef int i, j, k
     cdef int gx, gy
-    cdef np.ndarray[np.uint8_t, ndim=2] sobel_x = np.array([[-1, 0, 1],
-                                                             [-2, 0, 2],
-                                                             [-1, 0, 1]], dtype=np.uint8)
-    
-    cdef np.ndarray[np.uint8_t, ndim=2] sobel_y = np.array([[-1, -2, -1],
-                                                             [0, 0, 0],
-                                                             [1, 2, 1]], dtype=np.uint8)
+    cdef int gradient
 
     for i in range(1, height - 1):
         for j in range(1, width - 1):
             for k in range(channels):
-                gx = (sobel_x[0][0] * image[i - 1, j - 1, k] + sobel_x[0][1] * image[i - 1, j, k] + sobel_x[0][2] * image[i - 1, j + 1, k] +
-                      sobel_x[1][0] * image[i, j - 1, k] + sobel_x[1][1] * image[i, j, k] + sobel_x[1][2] * image[i, j + 1, k] +
-                      sobel_x[2][0] * image[i + 1, j - 1, k] + sobel_x[2][1] * image[i + 1, j, k] + sobel_x[2][2] * image[i + 1, j + 1, k])
+                gx = (image[i - 1, j + 1, k] + 2 * image[i, j + 1, k] + image[i + 1, j + 1, k]) - \
+                     (image[i - 1, j - 1, k] + 2 * image[i, j - 1, k] + image[i + 1, j - 1, k])
                 
-                gy = (sobel_y[0][0] * image[i - 1, j - 1, k] + sobel_y[0][1] * image[i - 1, j, k] + sobel_y[0][2] * image[i - 1, j + 1, k] +
-                      sobel_y[1][0] * image[i, j - 1, k] + sobel_y[1][1] * image[i, j, k] + sobel_y[1][2] * image[i, j + 1, k] +
-                      sobel_y[2][0] * image[i + 1, j - 1, k] + sobel_y[2][1] * image[i + 1, j, k] + sobel_y[2][2] * image[i + 1, j + 1, k])
+                gy = (image[i + 1, j - 1, k] + 2 * image[i + 1, j, k] + image[i + 1, j + 1, k]) - \
+                     (image[i - 1, j - 1, k] + 2 * image[i - 1, j, k] + image[i - 1, j + 1, k])
                 
                 gradient = int((gx**2 + gy**2)**0.5)
-                result[i, j, k] = max(0, min(255, gradient))
-    
+                if gradient > threshold:
+                    result[i, j, :] = edge_color
     return result
 
 

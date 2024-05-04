@@ -165,7 +165,7 @@ class Layers:
         self.update = True
     
     # TODO: Fix this method
-    def edge(self, x : int, y : int, radius: int , layer: int):
+    def edge(self, x : int, y : int, radius: int , layer: int , color: tuple, threshold: int):
         mask = mask_gen.box_mask_cython(x, y, radius, self.screen_width, self.screen_height)
         
         colors = self.colors[layer][mask]
@@ -178,7 +178,7 @@ class Layers:
         # Reshape the array to the closest box shape
         reshaped_arr = np.resize(colors, (rows, cols , 3))
 
-        colors = mask_gen.sobel_filter_cython(reshaped_arr)
+        colors = mask_gen.edge_cython(reshaped_arr , COLOR , threshold)
         colors = np.resize(colors, (length, 3))
         
         self.colors[layer][mask] = colors
@@ -300,10 +300,10 @@ while running:
             elif event.key == pygame.K_m:
                 current_layer = 0
                 layers.merge_all_layers()
-            elif event.key == pygame.K_t:
-                current_tool = (current_tool + 1) % len(tools)
-                print(f'{tools[current_tool]=}')
-                current_selected_tool = tools[current_tool]       
+            # elif event.key == pygame.K_t:
+            #     current_tool = (current_tool + 1) % len(tools)
+            #     print(f'{tools[current_tool]=}')
+            #     current_selected_tool = tools[current_tool]       
         
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left mouse button
@@ -335,7 +335,7 @@ while running:
                     layers.remove_items(current_layer, mask_gen.box_mask_cython(pos[0], pos[1], radius, screen_width, screen_height))
                     erase_box = True
                 elif current_selected_tool == 'edge':
-                    layers.edge(pos[0], pos[1], radius, current_layer)
+                    layers.edge(pos[0], pos[1], radius, current_layer , COLOR , 1.5)
                     edge = True
                 
             elif event.button == 4: # Scroll up
@@ -395,7 +395,7 @@ while running:
                 layers.remove_items(current_layer, mask_gen.box_mask_cython(pos[0], pos[1], radius, screen_width, screen_height))
             elif edge:
                 pos = pygame.mouse.get_pos()
-                layers.edge(pos[0], pos[1], radius, current_layer)
+                layers.edge(pos[0], pos[1], radius, current_layer , COLOR , 1.5)
                 
     # start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
