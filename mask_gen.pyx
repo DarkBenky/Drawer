@@ -165,4 +165,18 @@ cpdef box_mask_cython(int x, int y , int size, int screen_width, int screen_heig
 
     return mask
 
+cpdef draw_layers_cython(np.ndarray[np.npy_bool, ndim=3] layers,
+                                    np.ndarray[np.uint8_t, ndim=4] colors):
+    cdef np.ndarray[np.uint8_t, ndim=3] result = np.zeros((layers.shape[1],layers.shape[2],3), dtype=np.uint8)
+    cdef int i
+    cdef int leyers_count = layers.shape[0]
+    for i in range(leyers_count):
+        result[layers[i]] = colors[i, layers[i], :]
+    return result
 
+cpdef draw_layer_cython(np.ndarray[np.npy_bool, ndim=3] layers,
+                        np.ndarray[np.uint8_t, ndim=4] colors,
+                        current_layer : int):
+    cdef np.ndarray[np.uint8_t, ndim=3] result = np.zeros((layers.shape[1],layers.shape[2],3), dtype=np.uint8)
+    result[layers[current_layer]] = colors[current_layer][layers[current_layer]]
+    return result

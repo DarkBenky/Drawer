@@ -36,10 +36,14 @@ class Layers:
     def __init__(self, number_of_layers=5 , screen_width=650, screen_height=500):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.layers = [np.zeros((screen_width, screen_height), dtype=bool) for _ in range(number_of_layers)]
-        self.colors = [np.zeros((screen_width, screen_height, 3), dtype=np.uint8) for _ in range(number_of_layers)]
+        self.layers = np.zeros((num_layers,screen_width, screen_height), dtype=bool)
+        self.colors = np.zeros((num_layers,screen_width, screen_height, 3), dtype=np.uint8)
         self.last_rendered_layers = None
         self.update = False
+        self.last_rendered_layer = None
+        # self.count : int = 0
+        # self.render_v1 : float = 0.2
+        # self.render_v2 : float = 0.0
     
     def merge_all_layers(self):
         # Create an empty merged layer
@@ -82,23 +86,38 @@ class Layers:
         
         # Check if rendering only the current layer
         if render_current:
-            img[self.layers[current_layer]] = self.colors[current_layer][self.layers[current_layer]]
+            if self.last_rendered_layer is not None and self.update is False:
+                if np.array_equal(self.layers[current_layer], self.last_rendered_layer):
+                    return self.last_rendered_image_single
+            else:
+                img = mask_gen.draw_layer_cython(self.layers,self.colors,current_layer)
+                self.last_rendered_layer = self.layers[current_layer]
+                self.last_rendered_image_single = img
+                self.update = False
+            # img[self.layers[current_layer]] = self.colors[current_layer][self.layers[current_layer]]
         else:
             # Check if layers have changed since last render
             if self.last_rendered_layers is not None and self.update is False:
-                if all(np.array_equal(layer1, layer2) for layer1, layer2 in zip(self.layers, self.last_rendered_layers)):
+                if np.array_equal(self.layers, self.last_rendered_layers):
                     # No changes, return the previous image
                     # print('return_img:', time.time() - start), lenght
                     return self.last_rendered_image
-            
-            # Render all layers
-            for layer in range(len(self.layers)):
-                img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
-            
-            # Cache the rendered layers and image
-            self.last_rendered_layers = [layer.copy() for layer in self.layers]
-            self.last_rendered_image = img
-            self.update = False
+            else:
+                # self.count += 1
+                # start = time.time()
+                # for layer in range(len(self.layers)):
+                #     img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
+                # self.render_v1 += time.time() - start
+                # print('render V-1 time:', self.render_v1/self.count)
+                # start = time.time()
+                img = mask_gen.draw_layers_cython(self.layers,self.colors)
+                # self.render_v2 += time.time() - start
+                # print('render V-2 time:', self.render_v2/self.count)
+                
+                # Cache the rendered layers and image
+                self.last_rendered_layers = self.layers
+                self.last_rendered_image = img
+                self.update = False
         
         # print('return_img:', time.time() - start)
         return img
@@ -287,9 +306,11 @@ while running:
                 pygame.image.save(screen, "drawing.png")
             elif event.key == pygame.K_UP:
                 current_layer = min(current_layer + 1, num_layers-1)
+                layers.update = True
                 print(f'{current_layer=}')
             elif event.key == pygame.K_DOWN:
                 current_layer = max(current_layer - 1, 0)
+                layers.update = True
                 print(f'{current_layer=}')
             elif event.key == pygame.K_r:
                 COLOR = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
@@ -297,6 +318,7 @@ while running:
             elif event.key == pygame.K_SPACE:
                 render_current = not render_current
                 print(f'{render_current=}')
+                layers.update = True
             elif event.key == pygame.K_m:
                 current_layer = 0
                 layers.merge_all_layers()
