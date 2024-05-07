@@ -4,6 +4,7 @@ import random
 import time
 import mask_gen
 import pygame_gui
+from collections import deque
 
 
 # Initialize Pygame
@@ -36,15 +37,15 @@ class Layers:
     def __init__(self, number_of_layers=5 , screen_width=650, screen_height=500):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.layers = np.zeros((num_layers,screen_width, screen_height), dtype=bool)
+        self.layers = np.zeros((num_layers,screen_width, screen_height), dtype=np.bool_)
         self.colors = np.zeros((num_layers,screen_width, screen_height, 3), dtype=np.uint8)
-        self.last_rendered_layers = None
         self.update = False
+        self.last_rendered_image = None
         self.last_rendered_layer = None
-        # self.count : int = 0
-        # self.render_v1 : float = 0.0
-        # self.render_v2 : float = 0.0
-        # self.render_v3 : float = 0.0
+        self.background = {}
+        self.History = []
+        self.update_history = False
+
     
     def merge_all_layers(self):
         # Create an empty merged layer
@@ -83,7 +84,7 @@ class Layers:
     
     def return_img(self, render_current: bool, current_layer: int):
         # start = time.time()
-        img = np.zeros((self.screen_width, self.screen_height, 3), dtype=np.uint8)
+        
         
         # Check if rendering only the current layer
         if render_current:
@@ -92,40 +93,51 @@ class Layers:
                     return self.last_rendered_image_single
             else:
                 img = mask_gen.draw_layer_cython(self.layers,self.colors,current_layer)
-                self.last_rendered_layer = self.layers[current_layer]
+                self.last_rendered_layer = self.layers[current_layer].copy()
                 self.last_rendered_image_single = img
                 self.update = False
+                self.History.append((self.layers.copy(), self.colors.copy()))
+                return img
+                
             # img[self.layers[current_layer]] = self.colors[current_layer][self.layers[current_layer]]
         else:
-            # Check if layers have changed since last render
-            if self.last_rendered_layers is not None and self.update is False:
-                if np.array_equal(self.layers, self.last_rendered_layers):
-                    # No changes, return the previous image
-                    # print('return_img:', time.time() - start), lenght
-                    return self.last_rendered_image
-            else:
-                self.count += 1
-                # start = time.time()
-                for layer in range(len(self.layers)):
-                    img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
-                # self.render_v1 += time.time() - start
-                # print('render V-1 time:', self.render_v1/self.count)
-                # start = time.time()
-                # mask_gen.draw_layers_cython(self.layers,self.colors)
-                # self.render_v2 += time.time() - start
-                # print('render V-2 time:', self.render_v2/self.count)
-                # start = time.time()
-                # mask_gen.draw_layers_cython_v2(self.layers, self.colors)
-                # self.render_v3 += time.time() - start
-                # print('render V-3 time:', self.render_v3/self.count)
-                
-                # Cache the rendered layers and image
-                self.last_rendered_layers = self.layers
+            if self.update or self.last_rendered_image is None:
+                if self.background.get(current_layer-1) is not None:
+                    img = self.background[current_layer-1]
+                    for layer in range(current_layer, self.layers.shape[0]):
+                        img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
+                else:
+                    img = np.zeros((self.screen_width, self.screen_height, 3), dtype=np.uint8)
+                    for layer in range(self.layers.shape[0]):
+                        img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
+                        if layer == current_layer-1:
+                            self.background[layer] = img.copy()
+
                 self.last_rendered_image = img
+                if self.update_history:
+                    self.update_history = False
+                else:
+                    self.History.append([self.layers.copy(), self.colors.copy()])
                 self.update = False
+                return img
+            else:
+                return self.last_rendered_image
+            # Cache the rendered layers and image
+            
+            # print('return_img:', time.time() - start)
+    
+    def get_history(self):
+        try:
+            self.layers , self.colors = self.History.pop()
+            self.update = True
+            self.update_history = True
+        except Exception as e:
+            print(e)
+            print('No more history')
         
-        # print('return_img:', time.time() - start)
-        return img
+    def remove_layer_from_memory(self, key : int):
+        if self.background.get(key) is not None:
+            del self.background[key]
     
     def blur(self, x : int, y : int, radius: int , layer: int):
         mask = mask_gen.box_mask_cython(x, y, radius, self.screen_width, self.screen_height)
@@ -270,6 +282,11 @@ class Layers:
         for i in range(len(self.layers)):
             self.layers[i].fill(False)
             self.colors[i][:] = (0, 0, 0) 
+        
+        self.background = {}
+        self.last_rendered_image = None
+        self.last_rendered_image_single = None
+        self.History = []
 
 
 layers = Layers(num_layers, screen_width, screen_height)
@@ -306,7 +323,10 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_c:
-                layers.clear() 
+                layers.clear()
+            elif event.key == pygame.K_z:
+                print('undo')
+                layers.get_history()
             elif event.key == pygame.K_s:
                 pygame.image.save(screen, "drawing.png")
             elif event.key == pygame.K_UP:
@@ -315,6 +335,7 @@ while running:
                 print(f'{current_layer=}')
             elif event.key == pygame.K_DOWN:
                 current_layer = max(current_layer - 1, 0)
+                layers.remove_layer_from_memory(current_layer)
                 layers.update = True
                 print(f'{current_layer=}')
             elif event.key == pygame.K_r:
