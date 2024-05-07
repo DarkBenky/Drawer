@@ -42,8 +42,9 @@ class Layers:
         self.update = False
         self.last_rendered_layer = None
         # self.count : int = 0
-        # self.render_v1 : float = 0.2
+        # self.render_v1 : float = 0.0
         # self.render_v2 : float = 0.0
+        # self.render_v3 : float = 0.0
     
     def merge_all_layers(self):
         # Create an empty merged layer
@@ -103,16 +104,20 @@ class Layers:
                     # print('return_img:', time.time() - start), lenght
                     return self.last_rendered_image
             else:
-                # self.count += 1
+                self.count += 1
                 # start = time.time()
-                # for layer in range(len(self.layers)):
-                #     img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
+                for layer in range(len(self.layers)):
+                    img[self.layers[layer]] = self.colors[layer][self.layers[layer]]
                 # self.render_v1 += time.time() - start
                 # print('render V-1 time:', self.render_v1/self.count)
                 # start = time.time()
-                img = mask_gen.draw_layers_cython(self.layers,self.colors)
+                # mask_gen.draw_layers_cython(self.layers,self.colors)
                 # self.render_v2 += time.time() - start
                 # print('render V-2 time:', self.render_v2/self.count)
+                # start = time.time()
+                # mask_gen.draw_layers_cython_v2(self.layers, self.colors)
+                # self.render_v3 += time.time() - start
+                # print('render V-3 time:', self.render_v3/self.count)
                 
                 # Cache the rendered layers and image
                 self.last_rendered_layers = self.layers

@@ -174,6 +174,23 @@ cpdef draw_layers_cython(np.ndarray[np.npy_bool, ndim=3] layers,
         result[layers[i]] = colors[i, layers[i], :]
     return result
 
+#cpdef draw_layers_cython_v2(np.ndarray[np.npy_bool, ndim=3] layers,
+#                                   np.ndarray[np.uint8_t, ndim=4] colors):
+#    cdef int width = layers.shape[1]
+#    cdef int height = layers.shape[2]
+#    cdef np.ndarray[np.uint8_t, ndim=3] result = np.zeros((width, height, 3), dtype=np.uint8)
+#    cdef int i, j, k, num_layers = layers.shape[0]
+#    cdef np.npy_bool[:, :] covered = np.zeros((width, height), dtype=bool)
+#    
+#    for i in range(num_layers):
+#        for j in range(width):
+#            for k in range(height):
+#                if layers[i, j, k] and not covered[j, k]:
+#                    result[j, k] = colors[i, j, k]
+#                    covered[j, k] = True
+#
+#    return result
+
 cpdef draw_layer_cython(np.ndarray[np.npy_bool, ndim=3] layers,
                         np.ndarray[np.uint8_t, ndim=4] colors,
                         current_layer : int):
