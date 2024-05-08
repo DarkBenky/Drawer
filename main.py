@@ -302,7 +302,7 @@ drawing_box = False
 erase_box = False
 edge = False
 
-radius = 5
+
 
 clock = pygame.time.Clock()
 
@@ -315,8 +315,14 @@ render_current = False
 tools = ['draw', 'draw box' , 'erase' , 'erase box', 'blur' , 'blur circle' , 'contrast' , 'contrast circle' , 'edge']
 current_tool = 0
 current_selected_tool = tools[current_tool]
+radius = 5
+
+
+
+frames = 0
 
 while running:
+    frames += 1
     # Handle events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -449,6 +455,7 @@ while running:
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     
     # draw gui
+    # TODO: Implement own GUI this one is SLOW
     draw_gui(tools[current_tool], str(radius))
     
     pygame.display.flip()
