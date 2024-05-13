@@ -3,9 +3,7 @@ import numpy as np
 import random
 import time
 import mask_gen
-import pygame_gui
 from collections import deque
-
 
 # Initialize Pygame
 pygame.init()
@@ -17,20 +15,32 @@ num_layers = 5
 global screen
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Drawing App")
-gui_manager = pygame_gui.UIManager((screen_width, screen_height)) 
 
 # Set up colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 COLOR = (255, 0, 0)
 
+def draw_palette(screen, size):
+    pass
+    
+        
+    
 
-def draw_gui(current_selection : str , brush_size :str):
-    gui_manager.clear_and_reset()
-    label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((10, 10),(100,50)), text=current_selection, manager=gui_manager)
-    brush_size_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((90, 10),(140,50)), text='brush size: '+brush_size, manager=gui_manager)
-    gui_manager.update(1)
-    gui_manager.draw_ui(screen)
+def draw_gui(screen, current_selection: str, brush_size: str):
+
+    # Define font and text color
+    font = pygame.font.Font(None, 16)  # Choose font and size
+    text_color = (255, 255, 255)  # White color
+
+    # Render current selection text
+    current_selection_text = font.render(current_selection, True, text_color)
+    screen.blit(current_selection_text, (10, 10))  # Draw text at (10, 10) position
+
+    # Render brush size text
+    brush_size_text = font.render('brush size: ' + brush_size, True, text_color)
+    screen.blit(brush_size_text, (90, 10))  # Draw text at (90, 10) position
+
 
 
 class Layers:
@@ -318,11 +328,7 @@ current_selected_tool = tools[current_tool]
 radius = 5
 
 
-
-frames = 0
-
 while running:
-    frames += 1
     # Handle events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -454,9 +460,8 @@ while running:
     # start = time.time()
     screen.blit(pygame.surfarray.make_surface(layers.return_img(render_current=render_current,current_layer=current_layer)), (0, 0))
     
-    # draw gui
-    # TODO: Implement own GUI this one is SLOW
-    draw_gui(tools[current_tool], str(radius))
+    draw_gui(screen, tools[current_tool], str(radius))
+    draw_palette(screen,400)
     
     pygame.display.flip()
     # print('blit:',time.time()-start)
